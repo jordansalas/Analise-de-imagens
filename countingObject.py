@@ -10,14 +10,51 @@ import cv2
 import os, os.path
 import imutils
 
-def loadImage(dataBase):
-    #dataBase_path = "";
-    if dataBase == "Urban":
-        dataBase_path = "M:\\Periodo 2\\Estudo Orientado\\DB\\Urban1\\Urban1\\";
-    else:
-        print("Data base does not found")
-        return
-    print(dataBase_path);
+def filter(frame):
+    frame = cv2.GaussianBlur(frame, (9, 9), 0)
+    #frame = cv2.bilateralFilter(frame, 9, 75, 75)
+    #frame = cv2.medianBlur(frame,3)
+    return frame
+
+def transformation(frame):
+    kernelDilate = np.ones((7,7),np.uint8)
+    kernelErode = np.ones((3, 3), np.uint8)
+    kernel = np.ones((5, 5), np.uint8)
+    frame = cv2.dilate(frame,kernelDilate,iterations = 1)
+    frame = cv2.erode(frame,kernelErode,iterations = 1)
+    #frame = cv2.morphologyEx(frame,cv2.MORPH_OPEN,kernel)
+    frame = cv2.morphologyEx(frame,cv2.MORPH_CLOSE,kernel)
+    return frame
+
+def detection(frameOriginal, frameProcessed):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    contours = cv2.findContours(frameProcessed.copy(), cv2.RETR_EXTERNAL,
+                            cv2.CHAIN_APPROX_SIMPLE)
+    contours = contours[0] if imutils.is_cv2() else contours[1]
+    # loop over the contours
+    for contour in contours:
+        # ignore the small contours
+        if cv2.contourArea(contour) < 1500:
+            continue
+        (x, y, w, h) = cv2.boundingRect(contour)
+        distanceX = abs(x-w)
+        distanceY = abs(y-h)
+        if distanceX > distanceY:
+            proportion = distanceX/(distanceY+1)
+            proportion = round(proportion, 2)
+            if proportion < 3:
+                cv2.putText(frameOriginal,'Proportion: ' + str(proportion),(x,y), font, 0.5, (255,255,100), 1, cv2.LINE_AA)
+                cv2.rectangle(frameOriginal, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        else:
+            proportion = distanceY/(distanceX+1)
+            proportion = round(proportion, 2)
+            if proportion < 5:
+                cv2.putText(frameOriginal,'Proportion: ' + str(proportion),(x,y), font, 0.5, (255,255,100), 1, cv2.LINE_AA)
+                cv2.rectangle(frameOriginal, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        
+
+    return frameOriginal
 
 def backgroundSubtraction(video_path):
     cap = cv2.VideoCapture(video_path)
@@ -29,39 +66,17 @@ def backgroundSubtraction(video_path):
         fgmask = fgbg.apply(frame)
 
         # filters
-        filter = cv2.GaussianBlur(fgmask, (11, 11), 0)
-        #filter = cv2.bilateralFilter(fgmask, 9, 75, 75)
-        #filter = cv2.medianBlur(fgmask,3)
+        img_filter = filter(fgmask)
 
         # transformations
-        kernelDilate = np.ones((7,7),np.uint8)
-        kernelErode = np.ones((3, 3), np.uint8)
-        kernel = np.ones((5, 5), np.uint8)
-        transformacion = cv2.dilate(filter,kernelDilate,iterations = 1)
-        transformacion = cv2.erode(transformacion,kernelErode,iterations = 1)
-        #transformacion = cv2.morphologyEx(filter,cv2.MORPH_OPEN,kernel)
-        transformacion = cv2.morphologyEx(transformacion,cv2.MORPH_CLOSE,kernel)
+        img_transformed = transformation(img_filter)
 
         # countors
-        contours = cv2.findContours(transformacion.copy(), cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)
-        contours = contours[0] if imutils.is_cv2() else contours[1]
-        # loop over the contours
-        for contour in contours:
-    		# ignore the small contours
-            if cv2.contourArea(contour) < 1000:
-                continue
-            (x, y, w, h) = cv2.boundingRect(contour)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            text = "Occupied"
+        img_detection = detection(frame, img_transformed)
 
-        grey_3_channel = cv2.cvtColor(transformacion, cv2.COLOR_GRAY2BGR)
-
-        print("original: ", frame.dtype, frame.shape, frame.ndim, frame.size)
-        print("processed: ", grey_3_channel.dtype, grey_3_channel.shape, grey_3_channel.ndim, grey_3_channel.size)
-
-        # print original and
-        numpy_horizontal = np.hstack((frame, grey_3_channel))
+        # print original and processed frames
+        grey_3_channel = cv2.cvtColor(img_transformed, cv2.COLOR_GRAY2BGR)
+        numpy_horizontal = np.hstack((img_detection, grey_3_channel))
         cv2.imshow('frame',numpy_horizontal)
 
         k = cv2.waitKey(30) & 0xff

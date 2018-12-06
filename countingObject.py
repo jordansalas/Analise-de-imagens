@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 import os, os.path
 import imutils
+import argparse
 
 def filter(frame):
     frame = cv2.GaussianBlur(frame, (9, 9), 0)
@@ -51,8 +52,9 @@ def detection(frameOriginal, frameProcessed):
             if proportion < 5:
                 cv2.putText(frameOriginal,'Proportion: ' + str(proportion),(x,y), font, 0.5, (255,255,100), 1, cv2.LINE_AA)
                 cv2.rectangle(frameOriginal, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-        
+            if proportion > 5:
+                cv2.putText(frameOriginal,'Proportion: ' + str(proportion),(x,y), font, 0.5, (255,255,100), 1, cv2.LINE_AA)
+                cv2.rectangle(frameOriginal, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
     return frameOriginal
 
@@ -86,9 +88,42 @@ def backgroundSubtraction(video_path):
     cap.release()
     cv2.destroyAllWindows()
 
+def converImageToVideo(path):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-ext", "--extension", required=False, default='jpg', help="extension name. default is 'jpg'.")
+    ap.add_argument("-o", "--output", required=False, default='output.mp4', help="output video file")
+    args = vars(ap.parse_args())
+
+    # Arguments
+    dir_path = '.'
+    ext = args['extension']
+    output = args['output']
+
+    images = []
+    for file in os.listdir(path):
+        if file.endswith(ext):
+            images.append(file)
+
+    imagePath = os.path.join(path, images[0])
+    frame = cv2.imread(imagePath)
+    print("qwe: ", frame.shape)
+    height, width, channels = frame.shape
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output, fourcc, 20.0, (width, height))
+
+    for image in images:
+        imagePath = os.path.join(path, image)
+        frame = cv2.imread(imagePath)
+
+        out.write(frame)
+
+
 
 def main():
-    backgroundSubtraction("M:\\Periodo 2\\Estudo Orientado\\DB\\rheinhafen\\rheinhafen.mpg");
+    backgroundSubtraction("M:\\Periodo 2\\Estudo Orientado\\DB\\rheinhafen\\rheinhafen.mpg")
+    #backgroundSubtraction("M:\\Periodo 2\\Estudo Orientado\\DB\\Urban1\\outout.mp4")
+    #converImageToVideo("M:\\Periodo 2\\Estudo Orientado\\DB\\Urban1\\M:\Periodo 2\\Estudo Orientado\\DB\\Urban1\\test")
     #print(image.dtype)
     #print(image.shape)
     #print(image.ndim)
